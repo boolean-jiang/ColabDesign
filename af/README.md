@@ -13,6 +13,7 @@
   - support to fix the sequence for certain positions `model.prep_inputs(..., fix_pos="1-10")` (supported in protocols "fixbb" and "partial")
   - binder protocol improved, prior protocol would try to optimize number of contacts per target, new default is to optimize number of contacts per binder position. Number of contacts per binder position can be controlled with `model.set_opt("i_con",num=1)` and number of positions that should be contact with `model.set_opt("i_con",num_pos=5)`
   - implementing David Jones'-like protocol for semi-greedy optimization, where positions are selected based on plddt, and after 20 tries, the mutation that decreasing loss the most is accepted. `model.design_semigreedy()`
+  - WARNING: the returned pLDDT is now in the "correct" direction (higher is better)
 ### setup
 ```bash
 pip install git+https://github.com/sokrypton/ColabDesign.git
@@ -191,8 +192,7 @@ Instead, one can try (`tries`) a few random mutations and accept one with lowest
 model.design_3stage(hard_iters=0)
 # set number of model params to evaluate at each iteration
 num_models = 2 if model.args["use_templates"] else 5
-model.set_opt(num_models=num_models)
-model.design_semigreedy(iters=10, tries=20, use_plddt=True)
+model.design_semigreedy(iters=10, tries=20, num_models=num_models, use_plddt=True)
 ```
 #### I was getting better results before the major update (19June2022), how do I revert back to the old settings?
 We are actively trying to find the best weights `model.opt["weights"]`, settings `model.opt` for each protocol.
@@ -213,7 +213,7 @@ model.design_2stage(100, 100, 10)
 ```python
 model.set_weights(plddt=0.1, pae=0.1, i_pae=1.0, con=0.1, i_con=0.5)
 model.set_opt("con", binary=True, cutoff=21.6875, num=model._binder_len, seqsep=0)
-model.set_opt("i_con", binary=True, cutoff=21.6875, num=model._binder_len)
+model.set_opt("i_con", binary=True, cutoff=21.6875, num=model._target_len)
 model.design_3stage(100, 100, 10)
 ```
 #### I don't like your design_??? function, can I write my own with more detailed control?
