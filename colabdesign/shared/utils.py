@@ -2,35 +2,50 @@ import random
 import jax
 import numpy as np
 import jax.numpy as jnp
+import sys, gc
 
 def clear_mem():
+
+  # clear vram (GPU)
   backend = jax.lib.xla_bridge.get_backend()
   if hasattr(backend,'live_buffers'):
-    for buf in backend.live_buffers(): buf.delete()
+    for buf in backend.live_buffers():
+      buf.delete()
+
+  # clear ram (CPU)
+  # https://github.com/google/jax/issues/10828
+  for module_name, module in sys.modules.items():
+    if module_name.startswith("jax"):
+      for obj_name in dir(module):
+        obj = getattr(module, obj_name)
+        if hasattr(obj, "cache_clear"):
+          obj.cache_clear()
+  gc.collect()
 
 def update_dict(D, *args, **kwargs):
   '''robust function for updating dictionary'''
-  def set_dict(d, x):
+  def set_dict(d, x, override=False):
     for k,v in x.items():
       if v is not None:
         if k in d:
           if isinstance(v, dict):
-            set_dict(d[k], x[k])
+            set_dict(d[k], x[k], override=override)
+          elif override or d[k] is None:
+            d[k] = v
           elif isinstance(d[k],(np.ndarray,jnp.ndarray)):
             d[k] = np.asarray(v)
-          elif d[k] is None:
-            d[k] = v
           elif isinstance(d[k], dict):
             d[k] = jax.tree_map(lambda x: type(x)(v), d[k])
           else:
             d[k] = type(d[k])(v)
         else:
           print(f"ERROR: '{k}' not found in {list(d.keys())}")  
+  override = kwargs.pop("override", False)
   while len(args) > 0 and isinstance(args[0],str):
     D,args = D[args[0]],args[1:]
   for a in args:
-    if isinstance(a, dict): set_dict(D, a)
-  set_dict(D, kwargs)
+    if isinstance(a, dict): set_dict(D, a, override=override)
+  set_dict(D, kwargs, override=override)
 
 def copy_dict(x):
   '''deepcopy dictionary'''
@@ -49,7 +64,7 @@ def dict_to_str(x, filt=None, keys=None, ok=None, print_str=None, f=2):
   if keys is None: keys = []
   if filt is None: filt = {}
   if print_str is None: print_str = ""
-  if ok is None: ok = ""
+  if ok is None: ok = []
 
   # gather keys
   for k in x.keys():
@@ -57,7 +72,7 @@ def dict_to_str(x, filt=None, keys=None, ok=None, print_str=None, f=2):
       keys.append(k)
 
   for k in keys:
-    if k in x and (filt.get(k,True) or ok in k):
+    if k in x and (filt.get(k,True) or k in ok):
       v = x[k]
       if isinstance(v,float):
         if int(v) == v:
