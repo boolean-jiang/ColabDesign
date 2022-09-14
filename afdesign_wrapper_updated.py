@@ -39,6 +39,8 @@ def main():
 
     model.restart(opt=opt, weights=weights)
 
+    print("Script actually startingggg")
+
     #Add ability to disable residues, set seq, etc. with CLI arguments later 
 
     #accept CLI arguments for num_recycles later 
